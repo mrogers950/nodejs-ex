@@ -62,6 +62,7 @@ var initDb = function(callback) {
 function authenticateWrapper(req, res, next) {
     var auth = req.headers.authorization;  // auth is in base64(username:password)  so we need to decode the base64
     console.log("wrapper: Authorization Header is: ", auth);
+    console.log("KRB5_KTNAME: ", process.env['KRB5_KTNAME']);
     if (auth == undefined) {     // No Authorization header was passed in so it's the first time the browser hit us
 	// Sending a 401 will require authentication, we need to send the 'WWW-Authenticate' to tell them the sort of authentication to use
 	// Basic auth is quite literally the easiest and least secure, it simply gives back  base64( username + ":" + password ) from the browser
@@ -74,7 +75,7 @@ function authenticateWrapper(req, res, next) {
 
 	console.log(ticket);
 	var kerberosobj = new kerberos.Kerberos();
-	//console.log(req);
+	console.log(req);
 
 	//init context
 	kerberosobj.authGSSServerInit("HTTP", function (err, context) {
