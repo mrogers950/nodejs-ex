@@ -59,52 +59,38 @@ var initDb = function(callback) {
   });
 };
 
+kerb = new kerberos.Kerberos();
+
 function authenticateWrapper(req, res, next) {
-    var auth = req.headers.authorization;  // auth is in base64(username:password)  so we need to decode the base64
+    var auth = req.headers.authorization;
     console.log("wrapper: Authorization Header is: ", auth);
     console.log("KRB5_KTNAME: ", process.env['KRB5_KTNAME']);
-    if (auth == undefined) {     // No Authorization header was passed in so it's the first time the browser hit us
-	// Sending a 401 will require authentication, we need to send the 'WWW-Authenticate' to tell them the sort of authentication to use
-	// Basic auth is quite literally the easiest and least secure, it simply gives back  base64( username + ":" + password ) from the browser
+    if (auth == undefined) { 
 	res.setHeader('WWW-Authenticate', 'Negotiate');
 	console.log('wrapper: No authorization found, send 401.');
-	res.sendStatus(401);
+	return res.status(401).send();
     } else {
-	//cut phrase "Negotiate "
 	var ticket = req.headers.authorization.substring(10);
-
 	console.log(ticket);
-	var kerberosobj = new kerberos.Kerberos();
-	console.log(req);
 
-	//init context
-	kerberosobj.authGSSServerInit("HTTP", function (err, context) {
+	kerb.authGSSServerInit("HTTP", function (err, context) {
+	    if (err) {
+		    console.log(err);
+		    return 1;
+	    }
 
-	    console.log(err);
-
-	    //check ticket                
-	    kerberosobj.authGSSServerStep(context, ticket, function (err) {
-		//in success context contains username
-		console.log(err);
-		res.setHeader('WWW-Authenticate', 'Negotiate ' + context.response);
-		res.setHeader('UXTF-userid', context.username);
-		next();
+	    kerb.authGSSServerStep(context, ticket, function (err) {
+		if (err) {
+			console.log(err);
+			return 1;
+		}
+		console.log(context.username);
+		return 0;
+		//res.setHeader('WWW-Authenticate', 'Negotiate ' + context.response);
+		//res.setHeader('UXTF-userid', context.username);
+		//next();
 	    });
 	});
-
-
-	// var KerberosNative = require('kerberos').Kerberos;
-	// var kerberos = new KerberosNative();
-
-	// //init context
-	// kerberos.authGSSServerInit("HTTP", function (err, context) {
-	//     //check ticket
-	//     kerberos.authGSSServerStep(context, ticket, function (err) {
-	//         //in success context contains username
-	//         res.send(context.username);
-	//     });
-	// });
-
     }
 }
 
@@ -113,7 +99,11 @@ app.get('/', function (req, res, next) {
   // initialized.
   //
   console.log('Running authenticateWrapper');
-  authenticateWrapper(req, res, next);
+  if (authenticateWrapper(req, res, next)) {
+	  console.log("authenticateWrapper failed");
+	  res.render('failindex.html');
+	  return;
+  }
 
   if (!db) {
     initDb(function(err){});
